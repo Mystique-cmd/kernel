@@ -1,0 +1,59 @@
+ 1. GDT Address Calculation Problem
+ - Check if gdt_descriptor is being loaded with the correct memory
+address of gdt_start
+ - The address should be absolute (0x10000 + offset), not relative
+ - Use hexdump on kernel.bin to verify the address bytes in the GDTR
+ 2. Segment Descriptor Encoding
+ - Verify your code/data segment descriptors have the correct bit
+patterns
+ - Check: presence bit (bit 7 of access byte should be 1), descriptor
+type bits, and flags
+ - The base address for both should be 0x00000000 (flat model)
+ 3. Far Jump Label Not Resolving
+ - jmp CODE_SEL:protected_start_abs might not be jumping to the right
+address
+ - The label protected_start_abs might be at an unexpected offset
+ - Add debug output by printing to video memory before the jump to
+confirm code reaches that point
+ 4. CPU State After Mode Switch
+ - After setting the PE bit and jumping, segment registers might not be
+flushed properly
+ - The bits 32 directive only tells NASM, it doesn't change CPU mode—you
+must jump
+ - Verify the jump actually transitions to 32-bit mode
+ 5. Data Access in Protected Mode
+ - mov esi, pm_msg uses a 16-bit real mode address
+ - In protected mode, esi needs a valid address within the data segment's
+ 4GB flat space
+ - The message string location (0x10000 + offset) must be accessible via
+the data segment
+ 6. String Pointer Calculation
+ - pm_msg is defined early in the file (around offset 0x37 in kernel.bin
+based on hexdump)
+ - When you do mov esi, pm_msg in 32-bit mode, does it load the correct
+linear address?
+ - Use objdump or examine the assembled bytes to see what address is
+being loaded
+ 7. Video Memory Access
+ - 0xB8000 should be accessible in protected mode with a flat 4GB data
+segment
+ - But if you're still in real mode, the direct write won't work
+ 8. Infinite Loop or Crash
+ - The jmp $ at the end suggests the kernel reaches that point
+ - But if there's an exception/fault before printing, execution stops
+silently
+ - Check: Did you execute all initialization steps before the loop?
+
+How to Debug:
+
+ - Add BIOS calls (int 0x10) before entering protected mode to print
+debug characters
+ - Write directly to video memory at 0xB8000 (character at offset 0,
+attribute at offset 1) in real mode to test writes work
+ - Use objdump -d kernel.bin to verify the assembled instruction bytes
+match your intent
+ - Check the actual byte values of your far jump instruction
+
+What I'd focus on first: Verify that mov esi, pm_msg is loading the
+correct linear address in 32-bit mode. Print the values to video memory
+before the loop to confirm.

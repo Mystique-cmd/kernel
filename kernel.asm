@@ -1,6 +1,3 @@
-; Mystique OS Kernel - Minimal Protected Mode Test
-; Entry point at 0x10000
-
 org 0x10000
 bits 16
 
