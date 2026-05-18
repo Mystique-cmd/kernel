@@ -73,10 +73,9 @@ mov ds, ax
 mov es, ax
 mov ss, ax
 
-; Test: Write a single character 'P' to video memory and then halt
-mov byte [0xB8000], 'P'     ; Character
-mov byte [0xB8001], 0x0F    ; Attribute (white on black)
+; Test: Overwrite the first character of pm_msg with 'X'
+mov byte [pm_msg], 'X'
 
-jmp $ ; Halt the system after writing the character
+jmp $ ; Halt the system after the write
 
 times 1024 - ($ - $$) db 0
