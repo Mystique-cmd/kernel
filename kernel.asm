@@ -52,6 +52,11 @@ mov al, 'R'
 mov ah, 0x0E
 int 0x10
 
+; Set video mode to 80x25 text mode (Mode 3) for consistency
+mov ah, 0x00
+mov al, 0x03
+int 0x10
+
 ; Now try to enter protected mode
 cli
 
@@ -73,9 +78,23 @@ mov ds, ax
 mov es, ax
 mov ss, ax
 
-; Test: Overwrite the first character of pm_msg with 'X'
-mov byte [pm_msg], 'X'
+; Write "Protected Mode Enabled!" to video memory at 0xB8000
+mov edi, 0xB8000
+mov esi, pm_msg
+mov ecx, pm_msg_len
 
-jmp $ ; Halt the system after the write
+.write_loop:
+cmp ecx, 0
+je .done_msg
+mov al, byte [esi]
+mov byte [edi], al
+mov byte [edi + 1], 0x0F  ; White text on black background
+add edi, 2
+add esi, 1
+dec ecx
+jmp .write_loop
+
+.done_msg:
+jmp $
 
 times 1024 - ($ - $$) db 0
