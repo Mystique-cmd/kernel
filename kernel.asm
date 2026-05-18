@@ -1,9 +1,7 @@
 org 0x10000
 bits 16
 
-; GDT
 gdt_start:
-; Null descriptor
 dq 0x0000000000000000
 
 ; Code segment: 4GB, executable, readable
@@ -25,8 +23,8 @@ db 0x00          ; Base (31:24)
 gdt_end:
 
 gdt_descriptor:
-dw gdt_end - gdt_start - 1
-dd gdt_start
+dw gdt_end - gdt_start - 1 ; Limit - the size of the GDT( 16-bit)
+dd gdt_start ;Base - the start address ( 32-bit)
 
 CODE_SEL equ 8
 DATA_SEL equ 16
@@ -75,23 +73,10 @@ mov ds, ax
 mov es, ax
 mov ss, ax
 
-; Write "Protected Mode Enabled!" to video memory at 0xB8000
-mov edi, 0xB8000
-mov esi, pm_msg
-mov ecx, pm_msg_len
+; Test: Write a single character 'P' to video memory and then halt
+mov byte [0xB8000], 'P'     ; Character
+mov byte [0xB8001], 0x0F    ; Attribute (white on black)
 
-.write_loop:
-cmp ecx, 0
-je .done_msg
-mov al, byte [esi]
-mov byte [edi], al
-mov byte [edi + 1], 0x0F  ; White text on black background
-add edi, 2
-add esi, 1
-dec ecx
-jmp .write_loop
-
-.done_msg:
-jmp $
+jmp $ ; Halt the system after writing the character
 
 times 1024 - ($ - $$) db 0
