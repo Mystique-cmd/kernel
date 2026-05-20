@@ -5,7 +5,7 @@ org 0x7C00
 bits 16
 
 KERNEL_ADDR equ 0x10000; Load kernel at 0x10000
-KERNEL_SECTORS equ 2; Read 2 sectors (1024 bytes)
+KERNEL_SECTORS equ 20; Read 20 sectors (10240 bytes)
 KERNEL_SECTOR_START equ 2; Kernel starts at sector 2 (sector 1 = bootloader)
 
 start:
