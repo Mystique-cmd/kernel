@@ -124,7 +124,8 @@ setup_paging:
     ; Map virtual address 0-4MB to physical address 0-4MB
     ; PDE points to the physical address of page_table
     ; Flags: Present (P=1), Read/Write (RW=1)
-    mov eax, page_table | PAGING_FLAG_PRESENT | PAGING_FLAG_RW
+    mov eax, page_table
+    or eax, PAGING_FLAG_PRESENT | PAGING_FLAG_RW
     mov dword [page_directory], eax
 
     ; Setup Page Table Entries (PTEs)
