@@ -98,6 +98,71 @@ dec ecx
 jmp .write_loop
 
 .done_msg:
-jmp $
+    jmp $ ; Infinite loop after displaying message
 
-times 1024 - ($ - $$) db 0
+; --- Paging Constants ---
+PAGING_FLAG_PRESENT equ 0x001  ; Bit 0: Page is present in memory
+PAGING_FLAG_RW      equ 0x002  ; Bit 1: Read/Write enabled
+
+; --- Paging Functions ---
+setup_paging:
+    ; Clear page directory
+    ; Use the address of the page_directory label
+    mov edi, page_directory
+    xor eax, eax
+    mov ecx, 1024
+    rep stosd
+
+    ; Clear page table
+    ; Use the address of the page_table label
+    mov edi, page_table
+    xor eax, eax
+    mov ecx, 1024
+    rep stosd
+
+    ; Setup first Page Directory Entry (PDE)
+    ; Map virtual address 0-4MB to physical address 0-4MB
+    ; PDE points to the physical address of page_table
+    ; Flags: Present (P=1), Read/Write (RW=1)
+    mov eax, page_table | PAGING_FLAG_PRESENT | PAGING_FLAG_RW
+    mov dword [page_directory], eax
+
+    ; Setup Page Table Entries (PTEs)
+    ; Identity map first 4MB (0x00000000 - 0x003FFFFF)
+    ; Each PTE maps a 4KB page
+    mov edi, page_table
+    xor ecx, ecx
+.pte_loop:
+    ; Physical address = ecx * 4KB
+    mov eax, ecx
+    shl eax, 12 ; Multiply by 4096 (2^12)
+    ; Add flags: Present (P=1), Read/Write (RW=1)
+    or eax, PAGING_FLAG_PRESENT | PAGING_FLAG_RW
+    mov dword [edi + ecx * 4], eax
+    inc ecx
+    cmp ecx, 1024
+    jne .pte_loop
+
+    ; Load Page Directory Base Register (CR3)
+    mov eax, page_directory
+    mov cr3, eax
+
+    ; Enable Paging by setting the PG bit (bit 31) in CR0
+    mov eax, cr0
+    or eax, 0x80000000 ; Set PG bit (bit 31)
+    mov cr0, eax
+
+    ret
+
+; --- Paging Data Structures ---
+; Reserve space for Page Directory and Page Table
+; These will be appended to the end of the kernel.bin
+; Ensure 4KB alignment for these structures.
+
+align 4096 ; Align to a 4KB boundary
+page_directory:
+    resb 4096 ; 1024 entries * 4 bytes/entry = 4096 bytes (for PDE)
+
+align 4096 ; Align to a 4KB boundary
+page_table:
+    resb 4096 ; 1024 entries * 4 bytes/entry = 4096 bytes (for PTE)
