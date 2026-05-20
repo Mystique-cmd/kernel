@@ -76,13 +76,16 @@ protected_start_abs:
 mov ax, DATA_SEL
 mov ds, ax
 mov es, ax
-mov ss, ax
+    mov ss, ax
+
+    ; *** New Paging Setup Code Starts Here ***
+    call setup_paging
+    ; *** New Paging Setup Code Ends Here ***
 
 ; Write "Protected Mode Enabled!" to video memory at 0xB8000
 mov edi, 0xB8000
 mov esi, pm_msg
 mov ecx, pm_msg_len
-
 .write_loop:
 cmp ecx, 0
 je .done_msg
