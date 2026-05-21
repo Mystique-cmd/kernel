@@ -147,6 +147,40 @@ setup_paging:
     cmp ecx, 1024
     jne .pte_loop
 
+    ; --- New: Setup higher-half mapping for kernel ---
+    ; Clear kernel_page_table
+    mov edi, kernel_page_table
+    xor eax, eax
+    mov ecx, 1024
+    rep stosd
+
+    ; Setup PDE for higher-half kernel (0xC0000000)
+    ; This PDE will point to kernel_page_table
+    ; Index: 0xC0000000 / 0x400000 = 0x300 (768)
+    mov eax, kernel_page_table
+    or eax, PAGING_FLAG_PRESENT | PAGING_FLAG_RW
+    mov dword [page_directory + (KERNEL_VIRTUAL_BASE >> 22) * 4], eax ; PDE at index 768
+
+    ; Setup PTEs for the kernel in kernel_page_table
+    ; Map physical address KERNEL_PHYSICAL_BASE to virtual address KERNEL_VIRTUAL_BASE
+    ; Map 256 pages (1MB) for the kernel
+    mov ebx, KERNEL_PHYSICAL_BASE ; Physical address for kernel start
+    mov edi, kernel_page_table
+    xor ecx, ecx ; Loop counter for PTEs
+.kernel_pte_loop:
+    ; Calculate physical address for this PTE
+    mov eax, ebx
+    add eax, ecx shl 12 ; ebx + (ecx * 4KB)
+
+    ; Add flags: Present (P=1), Read/Write (RW=1)
+    or eax, PAGING_FLAG_PRESENT | PAGING_FLAG_RW
+    mov dword [edi + ecx * 4], eax
+
+    inc ecx
+    cmp ecx, 256 ; Map 256 pages (1MB) for the kernel
+    jne .kernel_pte_loop
+
+
     ; Load Page Directory Base Register (CR3)
     mov eax, page_directory
     mov cr3, eax
@@ -156,7 +190,16 @@ setup_paging:
     or eax, 0x80000000 ; Set PG bit (bit 31)
     mov cr0, eax
 
-    ret
+    ; Now we are running in the higher half.
+    ; Adjust the stack to the higher half as well.
+    mov ebp, 0xC0000000 + 0xFFFE ; Example stack in higher half
+    mov esp, ebp
+
+    ; Far jump to protected mode (using explicit absolute address)
+    ; Now, jump to the virtual address of protected_start_abs
+    mov eax, protected_start_abs
+    add eax, KERNEL_VIRTUAL_BASE - KERNEL_PHYSICAL_BASE
+    jmp CODE_SEL:eax
 
 ; --- Paging Data Structures ---
 ; Reserve space for Page Directory and Page Table
