@@ -1,4 +1,3 @@
-org 0x10000
 bits 16
 
 KERNEL_PHYSICAL_BASE equ 0x10000
@@ -75,6 +74,7 @@ mov cr0, eax
 jmp CODE_SEL:protected_start_abs
 
 bits 32
+[org KERNEL_VIRTUAL_BASE + protected_start_abs - KERNEL_PHYSICAL_BASE]
 protected_start_abs:
 mov ax, DATA_SEL
 mov ds, ax
