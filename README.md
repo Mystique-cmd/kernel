@@ -81,9 +81,8 @@ The QEMU window will display:
 Mystique OS Bootloader
 Loading kernel...
 Kernel loaded successfully! Entering kernel...
-Kernel loaded and running!
+Protected Mode Enabled!
 ```
-
 Then it will hang in an infinite loop (normal behavior). To exit QEMU, press `Ctrl+Alt+Q` or close the window.
 
 ## Architecture: Bootloader vs Kernel
@@ -111,9 +110,27 @@ The bootloader and kernel have different roles and constraints:
 1. BIOS loads bootloader from sector 0 → 0x7C00
 2. Bootloader displays messages
 3. Bootloader reads kernel from sectors 1+ → 0x10000 (using BIOS int 0x13)
-4. Bootloader jumps to kernel at 0x10000
-5. Kernel runs OS code
+4. Bootloader jumps to kernel at 0x10000 (physical address)
+5. Kernel sets up GDT and enters Protected Mode
+6. Kernel sets up paging, mapping itself to a higher virtual address (e.g., 0xC0000000)
+7. Kernel performs a far jump to its new virtual address and continues execution
+8. Kernel runs OS code from the higher virtual address
 ```
+
+## Memory Management (Paging and Higher-Half Kernel)
+
+The kernel now implements basic memory management using paging.
+
+### Why Paging?
+Paging provides memory protection, allows for virtual memory, and isolates processes. Each program (including the kernel) gets its own view of memory, enhancing stability and security.
+
+### Higher-Half Kernel
+To leave the lower virtual address space (0x00000000 to 0xBFFFFFFF) free for user-space applications, the kernel itself is mapped to a "higher half" of the virtual address space, starting from `0xC0000000`.
+
+-   **Physical Load Address:** The kernel is physically loaded by the bootloader at `0x10000`.
+-   **Virtual Execution Address:** After paging is enabled, the kernel code executes from virtual address `0xC0000000`. This means any internal references within the kernel are resolved to this higher virtual address, while the actual physical memory remains at `0x10000`.
+
+This setup allows for a clean separation between kernel and user memory spaces, a fundamental concept in modern operating systems.
 
 ## What Each Component Does
 
@@ -125,8 +142,9 @@ The bootloader and kernel have different roles and constraints:
 
 ### Kernel
 1. **Initializes kernel environment** - Sets up segments and stack
-2. **Prints kernel message** - Confirms successful load
-3. **Ready for expansion** - Framework for paging, memory protection, user programs
+2. **Sets up Paging and Higher-Half Kernel** - Configures memory management to run in a higher virtual address space (`0xC0000000`).
+3. **Prints kernel message** - Confirms successful load and protected mode operation
+4. **Ready for expansion** - Framework for advanced OS features
 
 ## Bootloader Configuration
 
