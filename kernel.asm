@@ -170,3 +170,7 @@ page_directory:
 align 4096 ; Align to a 4KB boundary
 page_table:
     resb 4096 ; 1024 entries * 4 bytes/entry = 4096 bytes (for PTE)
+
+align 4096 ; Align to a 4KB boundary
+kernel_page_table:
+    resb 4096 ; 1024 entries * 4 bytes/entry = 4096 bytes (for PTEs for kernel higher half)
