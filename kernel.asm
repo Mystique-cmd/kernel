@@ -74,8 +74,7 @@ mov cr0, eax
 jmp CODE_SEL:protected_start_abs
 
 bits 32
-[org KERNEL_VIRTUAL_BASE + protected_start_abs - KERNEL_PHYSICAL_BASE]
-protected_start_abs:
+protected_start_abs: 
 mov ax, DATA_SEL
 mov ds, ax
 mov es, ax
@@ -83,6 +82,7 @@ mov es, ax
 
     ; *** New Paging Setup Code Starts Here ***
     call setup_paging
+    call setup_user_paging
     ; *** New Paging Setup Code Ends Here ***
 
 ; Write "Protected Mode Enabled!" to video memory at 0xB8000
@@ -106,6 +106,7 @@ jmp .write_loop
 ; --- Paging Constants ---
 PAGING_FLAG_PRESENT equ 0x001  ; Bit 0: Page is present in memory
 PAGING_FLAG_RW      equ 0x002  ; Bit 1: Read/Write enabled
+PAGING_FLAG_USER   equ 0x004  ; Bit 2: User/supervisor (1=user)
 
 ; --- Paging Functions ---
 setup_paging:
@@ -170,7 +171,9 @@ setup_paging:
 .kernel_pte_loop:
     ; Calculate physical address for this PTE
     mov eax, ebx
-    add eax, ecx shl 12 ; ebx + (ecx * 4KB)
+    mov edx, ecx
+    shl edx, 12
+    add eax, edx
 
     ; Add flags: Present (P=1), Read/Write (RW=1)
     or eax, PAGING_FLAG_PRESENT | PAGING_FLAG_RW
@@ -199,13 +202,16 @@ setup_paging:
     ; Now, jump to the virtual address of protected_start_abs
     mov eax, protected_start_abs
     add eax, KERNEL_VIRTUAL_BASE - KERNEL_PHYSICAL_BASE
-    jmp CODE_SEL:eax
+    jmp CODE_SEL:protected_start_abs
 
 ; --- Paging Data Structures ---
 ; Reserve space for Page Directory and Page Table
 ; These will be appended to the end of the kernel.bin
 ; Ensure 4KB alignment for these structures.
 
+; -----------------------------
+; Kernel paging structures
+; -----------------------------
 align 4096 ; Align to a 4KB boundary
 page_directory:
     resb 4096 ; 1024 entries * 4 bytes/entry = 4096 bytes (for PDE)
@@ -217,3 +223,86 @@ page_table:
 align 4096 ; Align to a 4KB boundary
 kernel_page_table:
     resb 4096 ; 1024 entries * 4 bytes/entry = 4096 bytes (for PTEs for kernel higher half)
+
+; -----------------------------
+; User paging structures
+; -----------------------------
+; Separate set of page tables for a user-space address space.
+; NOTE: Currently, the OS does not load a real user program yet.
+; This only sets up the data structures + mappings.
+
+align 4096 ; Align to a 4KB boundary
+user_page_directory:
+    resb 4096 ; 1024 PDEs
+
+align 4096 ; Align to a 4KB boundary
+user_page_table:
+    resb 4096 ; 1024 PTEs
+
+; -----------------------------
+; User-space constants
+; -----------------------------
+; Virtual base for the user program mapping.
+USER_VIRTUAL_BASE equ 0x00400000 ; 4MB
+
+; Physical base where the user program would live.
+; (For now we map it as if it were loaded here.)
+USER_PHYSICAL_BASE equ 0x00000000
+
+; Maps 1MB of user virtual memory.
+USER_MAPPING_SIZE_PAGES equ 256
+
+; -----------------------------
+; User paging setup routines
+; -----------------------------
+
+; setup_user_paging:
+;   Builds a separate page directory/table for user-space.
+;   Does NOT switch CR3.
+setup_user_paging:
+    ; Clear user page directory
+    mov edi, user_page_directory
+    xor eax, eax
+    mov ecx, 1024
+    rep stosd
+
+    ; Clear user page table
+    mov edi, user_page_table
+    xor eax, eax
+    mov ecx, 1024
+    rep stosd
+
+    ; Install a PDE for USER_VIRTUAL_BASE
+    ; PDE index = USER_VIRTUAL_BASE / 4MB = USER_VIRTUAL_BASE >> 22
+    mov eax, user_page_table
+    or eax, PAGING_FLAG_PRESENT | PAGING_FLAG_RW | PAGING_FLAG_USER
+    mov dword [user_page_directory + (USER_VIRTUAL_BASE >> 22) * 4], eax
+
+    ; Fill PTEs for a contiguous region starting at USER_PHYSICAL_BASE.
+    mov edi, user_page_table
+    mov ecx, 0
+    mov ebx, USER_PHYSICAL_BASE
+
+.user_pte_loop:
+    mov eax, ebx
+    mov edx, ecx
+    shl edx, 12
+    add eax, edx
+    or eax, PAGING_FLAG_PRESENT | PAGING_FLAG_RW | PAGING_FLAG_USER
+    mov dword [edi + ecx * 4], eax
+
+    inc ecx
+    cmp ecx, USER_MAPPING_SIZE_PAGES
+    jne .user_pte_loop
+
+    ret
+
+; switch_to_user_space:
+;   Switches CR3 to the user page directory.
+;   Assumes paging is already enabled.
+switch_to_user_space:
+    mov eax, user_page_directory
+    mov cr3, eax
+    ret
+
+; (Kernel paging structures must remain defined after the functions.)
