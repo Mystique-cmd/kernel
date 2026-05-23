@@ -41,19 +41,6 @@ mov es, ax
 mov ss, ax
 mov sp, 0xFFFE
 
-; Print using BIOS (we know this works)
-mov al, 'K'
-mov ah, 0x0E
-int 0x10
-
-mov al, 'E'
-mov ah, 0x0E
-int 0x10
-
-mov al, 'R'
-mov ah, 0x0E
-int 0x10
-
 ; Set video mode to 80x25 text mode (Mode 3) for consistency
 mov ah, 0x00
 mov al, 0x03
